@@ -1,0 +1,34 @@
+# Test environment overrides
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/OWNER/backend
+  tag: latest  # Updated automatically by CI pipeline
+
+env:
+  PORT: "8080"
+  CORS_ALLOWED_ORIGINS: "https://app.test.collectiongeek.app"
+  # CONVEX_DEPLOY_URL: "<your-convex-test-deployment-url>"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.test.collectiongeek.app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - api.test.collectiongeek.app
+      secretName: backend-test-tls
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false

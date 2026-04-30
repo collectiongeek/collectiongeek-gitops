@@ -1,0 +1,38 @@
+# Production environment overrides
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/OWNER/backend
+  tag: latest  # Updated manually via promote-to-prod workflow
+
+env:
+  PORT: "8080"
+  CORS_ALLOWED_ORIGINS: "https://app.collectiongeek.app"
+  # CONVEX_DEPLOY_URL: "<your-convex-prod-deployment-url>"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.collectiongeek.app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - api.collectiongeek.app
+      secretName: backend-prod-tls
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 75
+  targetMemoryUtilization: 80

@@ -1,0 +1,33 @@
+# Production environment overrides
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/OWNER/frontend
+  tag: latest  # Updated manually via promote-to-prod workflow
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.collectiongeek.app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - app.collectiongeek.app
+      secretName: frontend-prod-tls
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilization: 75
+  targetMemoryUtilization: 80

@@ -1,0 +1,29 @@
+# Test environment overrides
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/OWNER/frontend
+  tag: latest  # Updated automatically by CI pipeline
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.test.collectiongeek.app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - hosts:
+        - app.test.collectiongeek.app
+      secretName: frontend-test-tls
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
