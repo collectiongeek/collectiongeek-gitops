@@ -3,7 +3,7 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.io/OWNER/backend
+  repository: ghcr.io/collectiongeek/backend
   tag: a9bd3d3
 
 env:

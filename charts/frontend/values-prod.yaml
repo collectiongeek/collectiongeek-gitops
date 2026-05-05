@@ -3,7 +3,7 @@
 replicaCount: 2
 
 image:
-  repository: ghcr.io/OWNER/frontend
+  repository: ghcr.io/collectiongeek/frontend
   tag: latest  # Updated manually via promote-to-prod workflow
 
 ingress:

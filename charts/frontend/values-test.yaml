@@ -3,7 +3,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/OWNER/frontend
+  repository: ghcr.io/collectiongeek/frontend
   tag: latest  # Updated automatically by CI pipeline
 
 ingress:

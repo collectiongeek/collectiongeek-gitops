@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/OWNER/frontend
+  repository: ghcr.io/collectiongeek/frontend
   tag: latest
   pullPolicy: IfNotPresent
   # pullSecret: ghcr-pull-secret  # Only needed if GHCR packages are private
