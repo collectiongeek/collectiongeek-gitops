@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/collectiongeek/frontend
-  tag: latest  # Updated automatically by CI pipeline
+  tag: 1f8dbd5
 
 ingress:
   enabled: true
