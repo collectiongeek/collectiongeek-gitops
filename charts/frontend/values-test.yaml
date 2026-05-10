@@ -27,3 +27,8 @@ resources:
 
 autoscaling:
   enabled: false
+
+config:
+  apiBaseUrl: "https://api.test.collectiongeek.app"
+  workosClientId: "client_01KR4G0N21Q7YDRS6WD7PRTHRX"
+  convexUrl: "https://animated-walrus-717.convex.cloud/"

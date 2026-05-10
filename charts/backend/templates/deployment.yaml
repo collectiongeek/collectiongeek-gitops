@@ -28,6 +28,9 @@ spec:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secretRef}}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

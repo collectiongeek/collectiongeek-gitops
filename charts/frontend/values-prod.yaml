@@ -31,3 +31,8 @@ autoscaling:
   maxReplicas: 10
   targetCPUUtilization: 75
   targetMemoryUtilization: 80
+
+config:
+  apiBaseUrl: "https://api.collectiongeek.app"
+  workosClientId: "client_01KR4G0NK1P5K7VJ5P892X9FQZ"
+  convexUrl: "https://expert-echidna-324.convex.cloud/"

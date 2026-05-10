@@ -10,6 +10,7 @@ env:
   PORT: "8080"
   CORS_ALLOWED_ORIGINS: "https://app.test.collectiongeek.app"
   # CONVEX_DEPLOY_URL: "<your-convex-test-deployment-url>"
+secretRef: collectiongeek-secrets
 
 ingress:
   enabled: true
