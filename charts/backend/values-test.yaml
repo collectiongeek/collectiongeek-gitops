@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/collectiongeek/backend
-  tag: b2bb711
+  tag: 2dc4fa8
 
 env:
   PORT: "8080"
