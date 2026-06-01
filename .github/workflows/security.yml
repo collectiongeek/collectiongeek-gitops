@@ -1,0 +1,61 @@
+name: Security Scan
+
+# IaC misconfig + secret scanning (Trivy) for Helm charts and ArgoCD
+# manifests. Posture: REPORT-ONLY — uploads to the Security tab, never
+# fails a PR. Tighten with exit-code: "1" once .trivyignore is tuned.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"   # weekly drift scan
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy (K8s misconfig / secrets)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to code scanning
+    steps:
+      - uses: actions/checkout@v6
+
+      # Render each chart with its env values so the scan sees what ArgoCD
+      # actually applies (prod/test replica counts, resources, ingress),
+      # not just chart defaults. Plain argocd/*.yaml are scanned as-is by
+      # the config step below.
+      - name: Render Helm charts
+        run: |
+          set -euo pipefail
+          mkdir -p rendered
+          for chart in backend frontend; do
+            for env in prod test; do
+              helm template "$chart" "charts/$chart" \
+                -f "charts/$chart/values-$env.yaml" \
+                > "rendered/$chart-$env.yaml"
+            done
+          done
+
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config          # K8s/Helm/manifest misconfig mode
+          scanners: misconfig,secret
+          format: sarif
+          output: trivy.sarif
+          exit-code: "0"              # report-only
+        env:
+          TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
