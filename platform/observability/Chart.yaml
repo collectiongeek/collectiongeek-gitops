@@ -1,0 +1,18 @@
+apiVersion: v2
+name: platform-observability
+description: >-
+  CollectionGeek in-cluster observability stack. Phase 1: Prometheus, Grafana
+  and Alertmanager via kube-prometheus-stack, plus the Phase 0 secrets wiring
+  (ClusterSecretStore + ExternalSecrets) that now lives in templates/.
+type: application
+# Chart version — bump on structural changes; Argo CD tracks git, not this.
+version: 1.0.0
+
+dependencies:
+  # Bundles Prometheus Operator, Prometheus, Alertmanager, Grafana,
+  # kube-state-metrics and node-exporter. Published as an OCI artifact
+  # (the legacy HTTPS chart repo lags behind). Pinned — upgrades are a
+  # deliberate PR that bumps this version and re-runs `helm dependency update`.
+  - name: kube-prometheus-stack
+    version: 87.7.0
+    repository: oci://ghcr.io/prometheus-community/charts

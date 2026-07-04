@@ -11,5 +11,13 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: http
+    {{- if .Values.metrics.enabled }}
+    # Cluster-internal only: the Ingress routes exclusively to "http", so
+    # /metrics is reachable by Prometheus but never from outside.
+    - port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
   selector:
     {{- include "backend.selectorLabels" . | nindent 4 }}

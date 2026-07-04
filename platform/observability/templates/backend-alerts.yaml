@@ -1,0 +1,60 @@
+{{- if .Values.backendMonitoring.enabled }}
+# Alert rules for the CollectionGeek backend. Picked up by Prometheus because
+# ruleSelectorNilUsesHelmValues=false (values.yaml) — no special label needed.
+# job matches "backend.*" so the same rules cover backend-test / backend-prod.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backend-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/part-of: platform-observability
+spec:
+  groups:
+    - name: collectiongeek-backend
+      rules:
+        # No backend series at all — Deployment, Service or ServiceMonitor is
+        # gone. `up == 0` can't catch this: with no target there IS no `up`.
+        - alert: BackendTargetAbsent
+          expr: absent(up{job=~"backend.*"}) == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Prometheus has no backend target"
+            description: "No backend target has been scraped for 10 minutes — the ServiceMonitor, Service or Deployment has disappeared."
+
+        - alert: BackendDown
+          expr: up{job=~"backend.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: {{`"Backend instance {{ $labels.instance }} is down"`}}
+            description: {{`"Scrapes of {{ $labels.instance }} (job {{ $labels.job }}) have failed for 5 minutes."`}}
+
+        - alert: BackendHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job=~"backend.*",status=~"5.."}[5m]))
+              /
+            sum(rate(http_requests_total{job=~"backend.*"}[5m]))
+              > 0.05
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Backend 5xx error rate above 5%"
+            description: {{`"{{ $value | humanizePercentage }} of backend requests returned 5xx over the last 10 minutes."`}}
+
+        - alert: BackendHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{job=~"backend.*"}[5m]))
+            ) > 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend p95 latency above 1s"
+            description: {{`"95th-percentile request latency has been {{ $value | humanizeDuration }} for 15 minutes."`}}
+{{- end }}

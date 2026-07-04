@@ -1,0 +1,152 @@
+# Shared values for the platform-observability umbrella chart.
+# Env-specific sizing/retention lives in values-test.yaml / values-prod.yaml.
+
+# ---------------------------------------------------------------------------
+# Flags consumed by our own templates/ (not by kube-prometheus-stack)
+# ---------------------------------------------------------------------------
+
+# Creates the gp3 StorageClass (EBS CSI). Deliberately NOT the cluster
+# default; consumers opt in via storageClassName.
+storageClass:
+  create: true
+
+# Syncs observability/slack-webhook from AWS Secrets Manager into the
+# alertmanager-slack-webhook Secret. Flip per-env TOGETHER WITH the Slack
+# receiver block in that env's values file — the AWS-side secret must exist
+# first (infra: observability_slack_webhook_url), or ESO sits in
+# SecretSyncedError and Alertmanager waits on a missing Secret mount.
+slackWebhook:
+  enabled: false
+
+# Backend dashboard + alert rules. Flip per-env AFTER the backend chart has
+# metrics.enabled=true and Prometheus shows the backend target as UP —
+# enabling the alerts first would page you about a target that never existed.
+backendMonitoring:
+  enabled: false
+
+# ---------------------------------------------------------------------------
+# kube-prometheus-stack
+# ---------------------------------------------------------------------------
+kube-prometheus-stack:
+  # Short resource names (kps-prometheus, kps-operator, ...) instead of
+  # platform-observability-kube-prometheus-stack-*.
+  fullnameOverride: kps
+
+  # The bundled community alert rules for Kubernetes itself — node pressure,
+  # crashlooping pods, PVCs filling up, Watchdog, etc.
+  defaultRules:
+    create: true
+    rules:
+      # Control-plane components EKS does not expose for scraping (below).
+      etcd: false
+      kubeControllerManager: false
+      kubeProxy: false
+      kubeSchedulerAlerting: false
+      kubeSchedulerRecording: false
+
+  # EKS is a managed control plane: etcd, scheduler, controller-manager and
+  # (by default) kube-proxy metrics are unreachable. Leaving these on creates
+  # permanently-down targets and false alerts.
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  prometheusOperator:
+    # Admission webhook certs from cert-manager (already a cluster addon)
+    # instead of the chart's patch Jobs — plays nicer with Argo CD syncs.
+    admissionWebhooks:
+      certManager:
+        enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  prometheus:
+    prometheusSpec:
+      # Watch ServiceMonitors/PodMonitors/Probes/Rules in ALL namespaces
+      # regardless of helm-release labels — without this, only objects
+      # labeled with this release name are picked up.
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      probeSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      scrapeConfigSelectorNilUsesHelmValues: false
+      serviceMonitorNamespaceSelector: {}
+      podMonitorNamespaceSelector: {}
+      probeNamespaceSelector: {}
+      ruleNamespaceSelector: {}
+
+      # TSDB on an encrypted gp3 EBS volume (StorageClass from templates/).
+      # Size/retention are per-env; see values-test.yaml / values-prod.yaml.
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 20Gi
+
+  alertmanager:
+    enabled: true
+    # Until Slack is enabled the chart's default config applies: everything
+    # routes to the "null" receiver (plus the Watchdog rule). The full Slack
+    # receiver block lives commented in each env values file.
+    alertmanagerSpec:
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+  grafana:
+    fullnameOverride: grafana
+    # Login comes from the ESO-synced Secret (Phase 0) — never from a chart
+    # value, never from Git.
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+    # Stateless on purpose: dashboards are provisioned from ConfigMaps by the
+    # sidecar, so losing the pod loses nothing. Ad-hoc edits made in the UI
+    # are disposable; anything worth keeping gets exported into Git.
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 192Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+
+  kube-state-metrics:
+    fullnameOverride: kube-state-metrics
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  prometheus-node-exporter:
+    fullnameOverride: node-exporter
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi

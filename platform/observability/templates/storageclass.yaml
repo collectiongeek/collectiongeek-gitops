@@ -1,0 +1,20 @@
+{{- if .Values.storageClass.create }}
+# gp3 EBS volumes via the aws-ebs-csi-driver addon (infra modules/eks).
+# Cluster-scoped, but defined here because observability is its first (and so
+# far only) consumer — move to a platform/storage tree if that changes.
+#
+# Deliberately NOT annotated as the cluster default: EKS ships a legacy gp2
+# default and two defaults are ambiguous. Consumers opt in with
+# storageClassName: gp3 (Prometheus does, via prometheusSpec.storageSpec).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+{{- end }}
