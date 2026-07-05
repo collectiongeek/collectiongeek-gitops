@@ -13,11 +13,21 @@ charts/
 ├── values.yaml        # Defaults
 ├── values-test.yaml   # Test cluster overrides
 └── values-prod.yaml   # Production cluster overrides
+platform/
+└── observability/    # Umbrella chart: kube-prometheus-stack + ESO wiring
+├── Chart.yaml         # Pins the kube-prometheus-stack dependency (OCI)
+├── values.yaml        # Shared values
+├── values-test.yaml   # Test sizing/retention + optional Slack/ingress blocks
+├── values-prod.yaml   # Prod sizing/retention + optional Slack/ingress blocks
+├── dashboards/        # Grafana dashboard JSON (provisioned via ConfigMap)
+└── templates/         # ClusterSecretStore, ExternalSecrets, StorageClass, alerts
 argocd/               # Argo CD Application manifests
 ├── backend-test.yaml
 ├── backend-prod.yaml
 ├── frontend-test.yaml
-└── frontend-prod.yaml
+├── frontend-prod.yaml
+├── platform-observability-test.yaml
+└── platform-observability-prod.yaml
 
 ## How Deployments Work
 
@@ -37,6 +47,12 @@ requires a manual sync in the Argo CD UI.
 helm template backend-test charts/backend \
   -f charts/backend/values.yaml \
   -f charts/backend/values-test.yaml
+
+# Observability umbrella chart (fetch the pinned dependency first)
+helm dependency build platform/observability
+helm template obs platform/observability \
+  -f platform/observability/values.yaml \
+  -f platform/observability/values-test.yaml --include-crds
 ```
 
 ## Environments

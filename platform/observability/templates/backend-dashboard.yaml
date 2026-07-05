@@ -1,0 +1,16 @@
+{{- if .Values.backendMonitoring.enabled }}
+# Grafana's sidecar watches for ConfigMaps labeled grafana_dashboard and
+# auto-provisions their JSON. The dashboard body lives in dashboards/ as raw
+# JSON (via .Files.Get) so Grafana's curly-brace legend syntax never collides
+# with Helm templating.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-backend
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  collectiongeek-backend.json: |-
+{{ .Files.Get "dashboards/backend.json" | indent 4 }}
+{{- end }}

@@ -1,0 +1,20 @@
+{{- if .Values.metrics.enabled }}
+# Tells Prometheus (via the operator) to scrape this chart's Service on the
+# "metrics" port. Requires the ServiceMonitor CRD — i.e. platform-observability
+# must be synced in this cluster BEFORE metrics.enabled is flipped, or this
+# manifest fails to apply.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "backend.fullname" . }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "backend.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+{{- end }}

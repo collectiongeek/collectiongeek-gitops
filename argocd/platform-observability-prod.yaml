@@ -12,6 +12,10 @@ spec:
     repoURL: https://github.com/collectiongeek/collectiongeek-gitops.git
     targetRevision: main
     path: platform/observability
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
 
   destination:
     server: https://kubernetes.default.svc
@@ -22,6 +26,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
+      # kube-prometheus-stack CRDs exceed the annotation size limit that
+      # client-side apply relies on; SSA is the supported path.
+      - ServerSideApply=true
 
     retry:
       limit: 3
