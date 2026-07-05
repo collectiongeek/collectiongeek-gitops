@@ -3,6 +3,13 @@ kind: Application
 metadata:
   name: platform-observability
   namespace: argocd
+  annotations:
+    # Pair ServerSideApply with SSA-based diffing. Argo's legacy diff relies on
+    # the last-applied annotation that SSA no longer writes, so it can't tell
+    # controller-defaulted fields (e.g. ESO's remoteRef defaults on
+    # grafana-admin) from real drift — the app sat perpetually OutOfSync and
+    # selfHeal re-synced it in a loop.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhooks=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
