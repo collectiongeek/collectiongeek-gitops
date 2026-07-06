@@ -4,7 +4,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/collectiongeek/frontend
-  tag: 58e9188
+  tag: 82640d9
 
 ingress:
   enabled: true
