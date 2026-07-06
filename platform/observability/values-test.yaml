@@ -82,3 +82,44 @@ kube-prometheus-stack:
   #   grafana.ini:
   #     server:
   #       root_url: https://grafana.test.collectiongeek.app
+
+# ---------------------------------------------------------------------------
+# Loki + Alloy (Phase 2) — logs. Enabled in test first; prod flips after the
+# test pipeline is verified end to end (doc §2.7/§2.8).
+# ---------------------------------------------------------------------------
+loki:
+  enabled: true
+  serviceAccount:
+    name: loki # MUST match the IRSA trust condition (observability:loki)
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::929123273666:role/app-test-loki
+  loki:
+    storage:
+      type: s3
+      bucketNames:
+        chunks: collectiongeek-app-test-loki-chunks-uswest1
+        ruler: collectiongeek-app-test-loki-chunks-uswest1 # unused (no ruler) but required
+      s3:
+        region: us-west-1
+    limits_config:
+      # 15d in test — strictly under the bucket's 90d lifecycle backstop.
+      retention_period: 360h
+  singleBinary:
+    resources:
+      requests:
+        cpu: 150m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+alloy:
+  enabled: true
+  alloy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

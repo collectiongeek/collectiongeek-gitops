@@ -2,11 +2,12 @@ apiVersion: v2
 name: platform-observability
 description: >-
   CollectionGeek in-cluster observability stack. Phase 1: Prometheus, Grafana
-  and Alertmanager via kube-prometheus-stack, plus the Phase 0 secrets wiring
-  (ClusterSecretStore + ExternalSecrets) that now lives in templates/.
+  and Alertmanager via kube-prometheus-stack. Phase 2: Loki + Alloy for logs.
+  Plus the Phase 0 secrets wiring (ClusterSecretStore + ExternalSecrets) that
+  now lives in templates/.
 type: application
 # Chart version — bump on structural changes; Argo CD tracks git, not this.
-version: 1.0.0
+version: 1.1.0
 
 dependencies:
   # Bundles Prometheus Operator, Prometheus, Alertmanager, Grafana,
@@ -16,3 +17,19 @@ dependencies:
   - name: kube-prometheus-stack
     version: 87.7.0
     repository: oci://ghcr.io/prometheus-community/charts
+
+  # Log storage (Phase 2). NOTE THE ORG: the OSS Loki chart moved to
+  # grafana-community in March 2026 (forked at 6.55.0); grafana/helm-charts'
+  # loki 7.x is Enterprise-only. Pinned — upgrades are a deliberate PR.
+  - name: loki
+    version: 18.4.0 # appVersion: Loki 3.7.3
+    repository: oci://ghcr.io/grafana-community/helm-charts
+    condition: loki.enabled
+
+  # Log collector, Promtail's successor (Promtail EOL'd March 2026). Still
+  # maintained by Grafana proper; not published as OCI, so pinned from the
+  # HTTPS repo.
+  - name: alloy
+    version: 1.10.0 # appVersion: Alloy v1.17.0
+    repository: https://grafana.github.io/helm-charts
+    condition: alloy.enabled
