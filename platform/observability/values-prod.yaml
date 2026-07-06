@@ -84,12 +84,11 @@ kube-prometheus-stack:
   #       root_url: https://grafana.collectiongeek.app
 
 # ---------------------------------------------------------------------------
-# Loki + Alloy (Phase 2) — logs. Flip BOTH enabled flags to true only after
-# the test pipeline is verified end to end AND the structured-logging backend
-# image is promoted to prod (doc §2.7) — then sync manually, as always.
+# Loki + Alloy (Phase 2) — logs. Enabled 2026-07-06 after the test pipeline
+# verified end to end (§2.8) and backend e3f6212 (slog) reached prod.
 # ---------------------------------------------------------------------------
 loki:
-  enabled: false
+  enabled: true
   serviceAccount:
     name: loki # MUST match the IRSA trust condition (observability:loki)
     annotations:
@@ -115,7 +114,7 @@ loki:
         memory: 1536Mi
 
 alloy:
-  enabled: false
+  enabled: true
   alloy:
     resources:
       requests:
