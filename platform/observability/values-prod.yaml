@@ -82,3 +82,45 @@ kube-prometheus-stack:
   #   grafana.ini:
   #     server:
   #       root_url: https://grafana.collectiongeek.app
+
+# ---------------------------------------------------------------------------
+# Loki + Alloy (Phase 2) — logs. Flip BOTH enabled flags to true only after
+# the test pipeline is verified end to end AND the structured-logging backend
+# image is promoted to prod (doc §2.7) — then sync manually, as always.
+# ---------------------------------------------------------------------------
+loki:
+  enabled: false
+  serviceAccount:
+    name: loki # MUST match the IRSA trust condition (observability:loki)
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::590728475829:role/app-prod-loki
+  loki:
+    storage:
+      type: s3
+      bucketNames:
+        chunks: collectiongeek-app-prod-loki-chunks-uswest1
+        ruler: collectiongeek-app-prod-loki-chunks-uswest1 # unused (no ruler) but required
+      s3:
+        region: us-west-1
+    limits_config:
+      # 60d in prod — strictly under the bucket's 90d lifecycle backstop.
+      retention_period: 1440h
+  singleBinary:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 768Mi
+      limits:
+        cpu: 750m
+        memory: 1536Mi
+
+alloy:
+  enabled: false
+  alloy:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

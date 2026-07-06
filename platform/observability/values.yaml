@@ -118,6 +118,14 @@ kube-prometheus-stack:
       existingSecret: grafana-admin
       userKey: admin-user
       passwordKey: admin-password
+    # Loki datasource (Phase 2). Grafana talks straight to the loki Service —
+    # no gateway (disabled below), no auth (single-tenant, ClusterIP only).
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki.observability.svc.cluster.local:3100
     # Stateless on purpose: dashboards are provisioned from ConfigMaps by the
     # sidecar, so losing the pod loses nothing. Ad-hoc edits made in the UI
     # are disposable; anything worth keeping gets exported into Git.
@@ -150,3 +158,152 @@ kube-prometheus-stack:
       limits:
         cpu: 100m
         memory: 64Mi
+
+# ---------------------------------------------------------------------------
+# Loki (Phase 2) — log storage. Chunks + index live in the per-env S3 bucket
+# (Phase 0), authenticated via IRSA: the "loki" ServiceAccount name below in
+# the env values files IS the credential — it must match the role's trust
+# condition (system:serviceaccount:observability:loki). Phase 2 doc §2.4.
+# Per-env: enabled flag, bucket, role ARN, retention, sizing.
+# ---------------------------------------------------------------------------
+loki:
+  enabled: false
+  fullnameOverride: loki # service is plainly "loki"
+
+  # One process does ingest+store+query. The scalable modes exist for tens of
+  # GB/day; two nodes of pod logs is megabytes. Scaling later is a values
+  # change (same schema, same bucket), not a migration.
+  deploymentMode: SingleBinary
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      storageClass: gp3 # the Phase 1 StorageClass
+      size: 10Gi        # WAL + working set only — the chunks live in S3
+  # The chart defaults the SimpleScalable trio to >0 replicas and refuses to
+  # render two modes at once — zero them explicitly.
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+
+  loki:
+    # Single-tenant. Safe for the same reason Prometheus is: ClusterIP only,
+    # no Ingress, nothing routes here from outside the cluster.
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1 # one binary — nobody to replicate to
+    schemaConfig:
+      configs:
+        - from: "2026-07-01" # any date before first ingest
+          store: tsdb        # current index format; v13 is its schema
+          object_store: s3
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    # The compactor DELETES: it is the retention authority. The bucket's 90d
+    # S3 lifecycle rule (Phase 0) is the strictly-longer backstop — never the
+    # other way around, or S3 would expire chunks the index still references.
+    # retention_period itself is per-env (limits_config in values-{test,prod}).
+    compactor:
+      retention_enabled: true
+      delete_request_store: s3
+
+  # The chart defaults to a fleet: nginx gateway, canary DaemonSet, helm-test
+  # pod, two memcached clusters, rules sidecar. All valuable at scale; all
+  # dead weight on a two-node cluster. Run exactly one Loki pod, nothing else.
+  gateway:
+    enabled: false # Grafana talks straight to the loki Service
+  lokiCanary:
+    enabled: false
+  test:
+    enabled: false
+  chunksCache:
+    enabled: false # memcached the chart sizes at GIGABYTES
+  resultsCache:
+    enabled: false
+  sidecar:
+    rules:
+      enabled: false # no ruler in Phase 2 — log alerts stay in Prometheus
+
+  monitoring:
+    serviceMonitor:
+      enabled: true # Phase 1's Prometheus scrapes Loki automatically
+
+# ---------------------------------------------------------------------------
+# Alloy (Phase 2) — log collector, one per node (DaemonSet). Tails the CRI
+# log files kubelet writes under /var/log/pods, attaches WHERE-labels only
+# (cardinality!), strips the CRI envelope, pushes to Loki. The backend's JSON
+# rides inside the line — parsed at query time, never at ingest. Doc §2.5.
+# ---------------------------------------------------------------------------
+alloy:
+  enabled: false
+  serviceMonitor:
+    enabled: true
+  alloy:
+    mounts:
+      varlog: true # hostPath /var/log — where kubelet writes pod logs
+    configMap:
+      content: |
+        // 1. Ask the API server for the pod inventory.
+        discovery.kubernetes "pods" {
+          role = "pod"
+        }
+
+        // 2. Attach the WHERE-labels (and only those), and compute each
+        //    pod's log file path on disk.
+        discovery.relabel "pod_logs" {
+          targets = discovery.kubernetes.pods.targets
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+            target_label  = "app"
+          }
+          rule {
+            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+            separator     = "/"
+            action        = "replace"
+            replacement   = "/var/log/pods/*$1/*.log"
+            target_label  = "__path__"
+          }
+        }
+
+        // 3. Resolve the globs to actual files ON THIS NODE. Every node's
+        //    Alloy discovers every pod but only finds local files — natural
+        //    sharding with zero coordination.
+        local.file_match "pod_logs" {
+          path_targets = discovery.relabel.pod_logs.output
+        }
+
+        // 4. Tail them.
+        loki.source.file "pod_logs" {
+          targets    = local.file_match.pod_logs.targets
+          forward_to = [loki.process.pod_logs.receiver]
+        }
+
+        // 5. Strip the CRI envelope (timestamp/stream/flags), push. No JSON
+        //    parsing at ingest — that happens at query time in LogQL.
+        loki.process "pod_logs" {
+          stage.cri {}
+          forward_to = [loki.write.default.receiver]
+        }
+
+        loki.write "default" {
+          endpoint {
+            url = "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+          }
+        }
