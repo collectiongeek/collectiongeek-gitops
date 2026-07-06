@@ -4,7 +4,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/collectiongeek/backend
-  tag: 58e9188
+  tag: 97e95a1
 
 env:
   PORT: "8080"
@@ -37,3 +37,9 @@ autoscaling:
   maxReplicas: 10
   targetCPUUtilization: 75
   targetMemoryUtilization: 80
+
+# Observability Phase 1 (§1.5): second container port (9090) + METRICS_PORT
+# env + ServiceMonitor. The platform-observability stack must already be
+# synced (ServiceMonitor CRD) — it is, since 2026-07-05.
+metrics:
+  enabled: true
