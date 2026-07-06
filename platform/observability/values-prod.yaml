@@ -4,12 +4,12 @@
 # enabling Slack for prod. Prerequisite: the AWS-side secret exists (infra:
 # OBSERVABILITY_SLACK_WEBHOOK_URL Environment secret applied). Phase 1 §1.7.
 slackWebhook:
-  enabled: false
+  enabled: true
 
 # Flip to true AFTER the backend chart has metrics.enabled=true and the
 # backend target shows UP in Prometheus. Phase 1 §1.5–1.6.
 backendMonitoring:
-  enabled: false
+  enabled: true
 
 kube-prometheus-stack:
   prometheus:
@@ -34,34 +34,34 @@ kube-prometheus-stack:
   # ---------------------------------------------------------------------
   # SLACK ALERTING — uncomment when enabling Slack (with slackWebhook above).
   # ---------------------------------------------------------------------
-  # alertmanager:
-  #   alertmanagerSpec:
-  #     # Mounts the ESO-synced Secret at
-  #     # /etc/alertmanager/secrets/alertmanager-slack-webhook/
-  #     secrets:
-  #       - alertmanager-slack-webhook
-  #   config:
-  #     global:
-  #       resolve_timeout: 5m
-  #     route:
-  #       group_by: ["namespace", "alertname"]
-  #       group_wait: 30s
-  #       group_interval: 5m
-  #       repeat_interval: 12h
-  #       receiver: slack
-  #       routes:
-  #         # Watchdog fires ALWAYS (it proves alerting works); route it away
-  #         # from Slack. Phase 4 turns it into a dead-man's switch.
-  #         - receiver: "null"
-  #           matchers:
-  #             - alertname = "Watchdog"
-  #     receivers:
-  #       - name: "null"
-  #       - name: slack
-  #         slack_configs:
-  #           - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/url
-  #             channel: "#alerts"
-  #             send_resolved: true
+  alertmanager:
+    alertmanagerSpec:
+      # Mounts the ESO-synced Secret at
+      # /etc/alertmanager/secrets/alertmanager-slack-webhook/
+      secrets:
+        - alertmanager-slack-webhook
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ["namespace", "alertname"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 12h
+        receiver: slack
+        routes:
+          # Watchdog fires ALWAYS (it proves alerting works); route it away
+          # from Slack. Phase 4 turns it into a dead-man's switch.
+          - receiver: "null"
+            matchers:
+              - alertname = "Watchdog"
+      receivers:
+        - name: "null"
+        - name: slack
+          slack_configs:
+            - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/url
+              channel: "#alerts"
+              send_resolved: true
 
   # ---------------------------------------------------------------------
   # GRAFANA INGRESS (optional) — uncomment to expose Grafana at a URL
