@@ -6,10 +6,13 @@ metadata:
   annotations:
     # Pair ServerSideApply with SSA-based diffing. Argo's legacy diff relies on
     # the last-applied annotation that SSA no longer writes, so it can't tell
-    # controller-defaulted fields (e.g. ESO's remoteRef defaults on
+    # API-server-defaulted fields (e.g. ESO's remoteRef schema defaults on
     # grafana-admin) from real drift — the app sat perpetually OutOfSync and
-    # selfHeal re-synced it in a loop.
-    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhooks=true
+    # selfHeal re-synced it in a loop. Deliberately NOT IncludeMutationWebhook:
+    # our drift is schema defaulting (covered by the SSA dry-run itself), and
+    # that flag widens the ServerSideDiff API's exposure of Secret data
+    # (GHSA-3v3m-wc6v-x4x3 — patched in our 3.4.3, but no reason to carry it).
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
