@@ -125,11 +125,11 @@ alloy:
         memory: 256Mi
 
 # ---------------------------------------------------------------------------
-# Tempo (Phase 3) — traces. STAGED DARK: flip enabled to true only after the
-# test pipeline is verified end to end (doc §3.7 step 4), then manual sync.
+# Tempo (Phase 3) — traces. Enabled 2026-07-07 after the test pipeline
+# verified end to end (§3.8) and backend 3dba8f2 (otel) reached prod.
 # ---------------------------------------------------------------------------
 tempo:
-  enabled: false
+  enabled: true
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: arn:aws:iam::590728475829:role/app-prod-tempo
