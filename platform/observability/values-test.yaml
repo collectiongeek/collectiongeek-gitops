@@ -123,3 +123,27 @@ alloy:
       limits:
         cpu: 200m
         memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Tempo (Phase 3) — traces. Enabled in test first; prod flips after the test
+# pipeline is verified end to end (doc §3.7/§3.8).
+# ---------------------------------------------------------------------------
+tempo:
+  enabled: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::929123273666:role/app-test-tempo
+  tempo:
+    storage:
+      trace:
+        s3:
+          bucket: collectiongeek-app-test-tempo-traces-uswest1
+          endpoint: s3.us-west-1.amazonaws.com
+          region: us-west-1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi

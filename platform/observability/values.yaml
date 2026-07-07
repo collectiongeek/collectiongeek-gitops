@@ -120,12 +120,35 @@ kube-prometheus-stack:
       passwordKey: admin-password
     # Loki datasource (Phase 2). Grafana talks straight to the loki Service —
     # no gateway (disabled below), no auth (single-tenant, ClusterIP only).
+    # Phase 3 adds Tempo, and links the two both ways: Loki's derived field
+    # turns the trace_id JSON field into a link to the trace; Tempo's
+    # tracesToLogsV2 runs a LogQL query for any span's trace ID.
     additionalDataSources:
       - name: Loki
         type: loki
         uid: loki
         access: proxy
         url: http://loki.observability.svc.cluster.local:3100
+        jsonData:
+          derivedFields:
+            - name: TraceID
+              datasourceUid: tempo
+              matcherRegex: '"trace_id":"([0-9a-f]+)"'
+              url: '${__value.raw}'
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://tempo.observability.svc.cluster.local:3200
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            # Spans and their logs can straddle chunk boundaries — search a
+            # window around the span, not just its exact duration.
+            spanStartTimeShift: "-5m"
+            spanEndTimeShift: "5m"
+            customQuery: true
+            query: '{namespace="app", container="backend"} | json | trace_id=`${__span.traceId}`'
     # Stateless on purpose: dashboards are provisioned from ConfigMaps by the
     # sidecar, so losing the pod loses nothing. Ad-hoc edits made in the UI
     # are disposable; anything worth keeping gets exported into Git.
@@ -234,18 +257,77 @@ loki:
       enabled: true # Phase 1's Prometheus scrapes Loki automatically
 
 # ---------------------------------------------------------------------------
+# Tempo (Phase 3) — trace storage, single binary. Blocks live in the per-env
+# S3 bucket (Phase 0) via IRSA: the "tempo" ServiceAccount name below IS the
+# credential (trust condition system:serviceaccount:observability:tempo).
+# Per-env: enabled flag, bucket, role ARN, retention override, sizing.
+# Doc §3.4.
+# ---------------------------------------------------------------------------
+tempo:
+  enabled: false
+  fullnameOverride: tempo # service is plainly "tempo"
+
+  tempo:
+    # The chart defaults to -mem-ballast-size-mbs=1024 — a deliberate 1 GiB
+    # allocation assuming much larger hosts. With our pod limits that is an
+    # instant OOM loop; zero it. (Doc §3.1: read the chart's defaults.)
+    memBallastSizeMbs: 0
+    reportingEnabled: false # no anonymous usage phone-home
+    # Single-tenant, same trust story as Loki's auth_enabled: false —
+    # ClusterIP only, nothing routes here from outside the cluster.
+    multitenancyEnabled: false
+    # Compactor block_retention: the deletion authority, strictly under the
+    # bucket's 30d lifecycle backstop (trace_retention_days, Phase 0).
+    # 7d here; prod overrides to 14d.
+    retention: 168h
+    storage:
+      trace:
+        backend: s3 # bucket/endpoint/region are per-env
+        wal:
+          path: /var/tempo/wal # on the PVC below
+    # NOTE: the chart's Service template hard-wires the Jaeger receiver
+    # ports — removing them from tempo.receivers breaks rendering. So Tempo
+    # also listens for Jaeger/Zipkin we never send: ClusterIP only, same
+    # trust boundary as the OTLP port itself. Accepted, not fought.
+
+  persistence:
+    enabled: true
+    storageClassName: gp3 # the Phase 1 StorageClass
+    size: 10Gi # WAL + working blocks only — traces live in S3
+
+  serviceAccount:
+    create: true
+    name: tempo # MUST match the IRSA trust condition — see §3.2a
+
+  serviceMonitor:
+    enabled: true # Phase 1's Prometheus scrapes Tempo automatically
+
+# ---------------------------------------------------------------------------
 # Alloy (Phase 2) — log collector, one per node (DaemonSet). Tails the CRI
 # log files kubelet writes under /var/log/pods, attaches WHERE-labels only
 # (cardinality!), strips the CRI envelope, pushes to Loki. The backend's JSON
 # rides inside the line — parsed at query time, never at ingest. Doc §2.5.
+# Phase 3 adds the trace pipeline: receive OTLP from the backend, batch,
+# forward to Tempo. Doc §3.5.
 # ---------------------------------------------------------------------------
 alloy:
   enabled: false
   serviceMonitor:
     enabled: true
+  fullnameOverride: alloy # service is plainly "alloy" — the backend sends
+    # OTLP to it by DNS name (Phase 3)
   alloy:
     mounts:
       varlog: true # hostPath /var/log — where kubelet writes pod logs
+    extraPorts: # OTLP receivers, exposed on the pod and the Service
+      - name: otlp-grpc
+        port: 4317
+        targetPort: 4317
+        protocol: TCP
+      - name: otlp-http
+        port: 4318
+        targetPort: 4318
+        protocol: TCP
     configMap:
       content: |
         // 1. Ask the API server for the pod inventory.
@@ -305,5 +387,35 @@ alloy:
         loki.write "default" {
           endpoint {
             url = "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+          }
+        }
+
+        // ---- Traces (Phase 3): receive OTLP, batch, hand to Tempo ----
+
+        // 6. Listen for OTLP from apps — the agent is an outlet, not a
+        //    destination (doc §3.1): apps know this endpoint, never Tempo.
+        otelcol.receiver.otlp "default" {
+          grpc { endpoint = "0.0.0.0:4317" }
+          http { endpoint = "0.0.0.0:4318" }
+          output {
+            traces = [otelcol.processor.batch.default.input]
+          }
+        }
+
+        // 7. Batch spans into fewer, larger writes — same reason the
+        //    app-side SDK batches: chatty small requests are the enemy.
+        otelcol.processor.batch "default" {
+          output {
+            traces = [otelcol.exporter.otlp.tempo.input]
+          }
+        }
+
+        // 8. Forward to Tempo over OTLP/gRPC. Plaintext in-cluster like
+        //    every other observability hop — TLS terminates at the Ingress
+        //    boundary; none of this is routable from outside.
+        otelcol.exporter.otlp "tempo" {
+          client {
+            endpoint = "tempo.observability.svc.cluster.local:4317"
+            tls { insecure = true }
           }
         }
