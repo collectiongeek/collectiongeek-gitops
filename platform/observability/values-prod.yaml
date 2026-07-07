@@ -64,24 +64,26 @@ kube-prometheus-stack:
               send_resolved: true
 
   # ---------------------------------------------------------------------
-  # GRAFANA INGRESS (optional) — uncomment to expose Grafana at a URL
-  # instead of port-forwarding. Phase 1 §1.6.
+  # GRAFANA INGRESS (Phase 1 §1.6, enabled 2026-07-07) — same exposure
+  # pattern as Argo CD: nginx + cert-manager TLS + external-dns record.
+  # Login stays the ESO-synced admin credential; SSO is a possible later
+  # upgrade (would remove the shared password entirely).
   # ---------------------------------------------------------------------
-  # grafana:
-  #   ingress:
-  #     enabled: true
-  #     ingressClassName: nginx
-  #     annotations:
-  #       cert-manager.io/cluster-issuer: letsencrypt-prod
-  #     hosts:
-  #       - grafana.collectiongeek.app
-  #     tls:
-  #       - hosts:
-  #           - grafana.collectiongeek.app
-  #         secretName: grafana-prod-tls
-  #   grafana.ini:
-  #     server:
-  #       root_url: https://grafana.collectiongeek.app
+  grafana:
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - grafana.collectiongeek.app
+      tls:
+        - hosts:
+            - grafana.collectiongeek.app
+          secretName: grafana-prod-tls
+    grafana.ini:
+      server:
+        root_url: https://grafana.collectiongeek.app
 
 # ---------------------------------------------------------------------------
 # Loki + Alloy (Phase 2) — logs. Enabled 2026-07-06 after the test pipeline
