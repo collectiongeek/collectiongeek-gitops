@@ -123,3 +123,29 @@ alloy:
       limits:
         cpu: 200m
         memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Tempo (Phase 3) — traces. STAGED DARK: flip enabled to true only after the
+# test pipeline is verified end to end (doc §3.7 step 4), then manual sync.
+# ---------------------------------------------------------------------------
+tempo:
+  enabled: false
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::590728475829:role/app-prod-tempo
+  tempo:
+    # 14d in prod — strictly under the bucket's 30d lifecycle backstop.
+    retention: 336h
+    storage:
+      trace:
+        s3:
+          bucket: collectiongeek-app-prod-tempo-traces-uswest1
+          endpoint: s3.us-west-1.amazonaws.com
+          region: us-west-1
+    resources:
+      requests:
+        cpu: 150m
+        memory: 384Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi

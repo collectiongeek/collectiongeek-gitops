@@ -3,11 +3,11 @@ name: platform-observability
 description: >-
   CollectionGeek in-cluster observability stack. Phase 1: Prometheus, Grafana
   and Alertmanager via kube-prometheus-stack. Phase 2: Loki + Alloy for logs.
-  Plus the Phase 0 secrets wiring (ClusterSecretStore + ExternalSecrets) that
-  now lives in templates/.
+  Phase 3: Tempo for traces (Alloy carries OTLP). Plus the Phase 0 secrets
+  wiring (ClusterSecretStore + ExternalSecrets) that now lives in templates/.
 type: application
 # Chart version — bump on structural changes; Argo CD tracks git, not this.
-version: 1.1.0
+version: 1.2.0
 
 dependencies:
   # Bundles Prometheus Operator, Prometheus, Alertmanager, Grafana,
@@ -28,8 +28,17 @@ dependencies:
 
   # Log collector, Promtail's successor (Promtail EOL'd March 2026). Still
   # maintained by Grafana proper; not published as OCI, so pinned from the
-  # HTTPS repo.
+  # HTTPS repo. Since Phase 3 it also receives OTLP traces from the backend
+  # and forwards them to Tempo.
   - name: alloy
     version: 1.10.0 # appVersion: Alloy v1.17.0
     repository: https://grafana.github.io/helm-charts
     condition: alloy.enabled
+
+  # Trace storage (Phase 3), single-binary mode. Same community org as Loki
+  # (the OSS charts moved there in March 2026). Pinned — upgrades are a
+  # deliberate PR.
+  - name: tempo
+    version: 2.2.3 # appVersion: Tempo 2.10.7
+    repository: oci://ghcr.io/grafana-community/helm-charts
+    condition: tempo.enabled
