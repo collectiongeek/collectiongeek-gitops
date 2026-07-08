@@ -127,9 +127,13 @@ kube-prometheus-stack:
       passwordKey: admin-password
     # WorkOS SSO (Portal SSO doc §S.4) — the env-independent half. Each env
     # values file supplies enabled, client_id and the AuthKit-domain URLs,
-    # plus envFromSecret for the client secret. The password login form
-    # stays available until §S.5 verification, then gets disabled per env.
+    # plus envFromSecret for the client secret.
     grafana.ini:
+      # §S.5 lock (verified both envs 2026-07-08): WorkOS is the only door.
+      # BREAK-GLASS: delete disable_login_form (one-line PR) to restore the
+      # password form — the ESO-synced grafana-admin secret still exists.
+      auth:
+        disable_login_form: true
       auth.generic_oauth:
         name: WorkOS
         scopes: openid profile email
