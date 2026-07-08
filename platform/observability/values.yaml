@@ -24,6 +24,13 @@ slackWebhook:
 backendMonitoring:
   enabled: false
 
+# Syncs observability/grafana-oidc into the grafana-oidc Secret (Portal SSO
+# doc §S.4). Flip per-env TOGETHER WITH the kube-prometheus-stack.grafana
+# envFromSecret + auth.generic_oauth block in that env's values file — the
+# AWS-side secret must exist first (infra: grafana_oidc_client_secret).
+grafanaOidc:
+  enabled: false
+
 # ---------------------------------------------------------------------------
 # kube-prometheus-stack
 # ---------------------------------------------------------------------------
@@ -118,6 +125,21 @@ kube-prometheus-stack:
       existingSecret: grafana-admin
       userKey: admin-user
       passwordKey: admin-password
+    # WorkOS SSO (Portal SSO doc §S.4) — the env-independent half. Each env
+    # values file supplies enabled, client_id and the AuthKit-domain URLs,
+    # plus envFromSecret for the client secret. The password login form
+    # stays available until §S.5 verification, then gets disabled per env.
+    grafana.ini:
+      auth.generic_oauth:
+        name: WorkOS
+        scopes: openid profile email
+        use_pkce: true
+        allow_sign_up: true # creates the Grafana user on first OIDC login;
+        # the strict role mapping below is what actually gates entry:
+        # app end-users share the WorkOS pool (authenticated != authorized),
+        # so exactly one identity maps to admin and EVERYONE ELSE IS DENIED.
+        role_attribute_path: "email=='29parsecs.dubious@icloud.com' && 'GrafanaAdmin' || ''"
+        role_attribute_strict: true
     # Loki datasource (Phase 2). Grafana talks straight to the loki Service —
     # no gateway (disabled below), no auth (single-tenant, ClusterIP only).
     # Phase 3 adds Tempo, and links the two both ways: Loki's derived field

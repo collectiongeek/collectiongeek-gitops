@@ -11,6 +11,11 @@ slackWebhook:
 backendMonitoring:
   enabled: true
 
+# Portal SSO §S.4: sync the WorkOS client secret for Grafana (see the
+# grafana envFromSecret + auth.generic_oauth block below).
+grafanaOidc:
+  enabled: true
+
 kube-prometheus-stack:
   prometheus:
     prometheusSpec:
@@ -66,8 +71,8 @@ kube-prometheus-stack:
   # ---------------------------------------------------------------------
   # GRAFANA INGRESS (Phase 1 §1.6, enabled 2026-07-07) — same exposure
   # pattern as Argo CD: nginx + cert-manager TLS + external-dns record.
-  # Login stays the ESO-synced admin credential; SSO is a possible later
-  # upgrade (would remove the shared password entirely).
+  # Login: WorkOS SSO (Portal SSO §S.4) — password form stays as fallback
+  # until §S.5 verification, then gets disabled.
   # ---------------------------------------------------------------------
   grafana:
     ingress:
@@ -81,9 +86,19 @@ kube-prometheus-stack:
         - hosts:
             - grafana.collectiongeek.app
           secretName: grafana-prod-tls
+    # WorkOS SSO (Portal SSO §S.4): client secret arrives as
+    # GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET via the ESO-synced Secret
+    # (grafanaOidc.enabled below). Endpoints = this env's AuthKit domain.
+    envFromSecret: grafana-oidc
     grafana.ini:
       server:
         root_url: https://grafana.collectiongeek.app
+      auth.generic_oauth:
+        enabled: true
+        client_id: client_01KWZKQEDW7KATZF5PMD30N2Z6
+        auth_url: https://polished-paper-76.authkit.app/oauth2/authorize
+        token_url: https://polished-paper-76.authkit.app/oauth2/token
+        api_url: https://polished-paper-76.authkit.app/oauth2/userinfo
 
 # ---------------------------------------------------------------------------
 # Loki + Alloy (Phase 2) — logs. Enabled 2026-07-06 after the test pipeline
