@@ -14,7 +14,7 @@ spec:
     # deploy what the promotion PR showed. Promote = bump this SHA (the PR
     # diff links the exact changeset), merge, `kubectl apply` this file,
     # then manual sync. Rollback = revert the promotion PR and repeat.
-    targetRevision: 4a028c144a6a67c8146394a402ecb6d66b59b382
+    targetRevision: 204d975ea24393b5da3ae72b8a226590b8dade9c
     path: charts/frontend
     helm:
       valueFiles:
