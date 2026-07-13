@@ -3,11 +3,12 @@ name: platform-observability
 description: >-
   CollectionGeek in-cluster observability stack. Phase 1: Prometheus, Grafana
   and Alertmanager via kube-prometheus-stack. Phase 2: Loki + Alloy for logs.
-  Phase 3: Tempo for traces (Alloy carries OTLP). Plus the Phase 0 secrets
-  wiring (ClusterSecretStore + ExternalSecrets) that now lives in templates/.
+  Phase 3: Tempo for traces (Alloy carries OTLP). Phase 4: blackbox uptime
+  probes + the Watchdog dead-man's switch. Plus the Phase 0 secrets wiring
+  (ClusterSecretStore + ExternalSecrets) that now lives in templates/.
 type: application
 # Chart version — bump on structural changes; Argo CD tracks git, not this.
-version: 1.2.0
+version: 1.3.0
 
 dependencies:
   # Bundles Prometheus Operator, Prometheus, Alertmanager, Grafana,
@@ -42,3 +43,10 @@ dependencies:
     version: 2.2.3 # appVersion: Tempo 2.10.7
     repository: oci://ghcr.io/grafana-community/helm-charts
     condition: tempo.enabled
+
+  # Uptime probing (Phase 4): fetches the public URLs like a user would and
+  # answers Prometheus scrapes with probe_* metrics about the attempt.
+  - name: prometheus-blackbox-exporter
+    version: 11.15.1 # appVersion: blackbox_exporter v0.28.0
+    repository: oci://ghcr.io/prometheus-community/charts
+    condition: prometheus-blackbox-exporter.enabled
