@@ -31,6 +31,20 @@ backendMonitoring:
 grafanaOidc:
   enabled: false
 
+# Uptime Probe + alert rules (Phase 4 §4.5). Flip per-env TOGETHER WITH
+# prometheus-blackbox-exporter.enabled (bottom of this file); the target
+# list is per-env.
+uptime:
+  enabled: false
+  targets: []
+
+# Syncs observability/healthchecks-ping into the alertmanager-healthchecks-ping
+# Secret (Phase 4 §4.6 dead-man's switch). Flip per-env TOGETHER WITH the
+# healthchecks receiver block in that env's values file — the AWS-side secret
+# must exist first (infra: healthchecks_ping_url), same rule as slackWebhook.
+healthchecksPing:
+  enabled: false
+
 # ---------------------------------------------------------------------------
 # kube-prometheus-stack
 # ---------------------------------------------------------------------------
@@ -445,3 +459,35 @@ alloy:
             tls { insecure = true }
           }
         }
+
+# ---------------------------------------------------------------------------
+# Blackbox exporter (Phase 4) — uptime probing from the user's vantage point.
+# The exporter doesn't probe on its own schedule: each Prometheus scrape of
+# /probe?target=<url> IS the probe. The Probe object in templates/ supplies
+# the per-env target list. Doc §4.5.
+# ---------------------------------------------------------------------------
+prometheus-blackbox-exporter:
+  enabled: false
+  fullnameOverride: blackbox # service is plainly "blackbox" — the Probe
+    # object references it by DNS name
+  # One module, strict on purpose: HTTPS or it didn't happen. A probe that
+  # "succeeded" over plain HTTP would mask a broken TLS setup — the exact
+  # failure this phase exists to catch.
+  config:
+    modules:
+      http_2xx:
+        prober: http
+        timeout: 10s
+        http:
+          preferred_ip_protocol: ip4
+          fail_if_not_ssl: true
+  serviceMonitor:
+    selfMonitor:
+      enabled: true # scrape the exporter's own /metrics too
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi

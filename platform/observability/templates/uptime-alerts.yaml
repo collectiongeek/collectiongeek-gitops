@@ -1,0 +1,47 @@
+{{- if .Values.uptime.enabled }}
+# Alert rules for the Phase 4 uptime probes. Picked up because
+# ruleSelectorNilUsesHelmValues=false (values.yaml) — no special label needed.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: uptime-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/part-of: platform-observability
+spec:
+  groups:
+    - name: collectiongeek-uptime
+      rules:
+        # The user's vantage: this URL does not work from a browser.
+        - alert: ProbeFailed
+          expr: probe_success == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: {{`"{{ $labels.instance }} is unreachable"`}}
+            description: {{`"Blackbox probes of {{ $labels.instance }} have failed for 3 minutes — DNS, load balancer, Ingress, TLS or pod."`}}
+
+        # No probe series at all — the Probe object or the exporter is gone.
+        # `probe_success == 0` can't catch this: with no probes there IS no
+        # probe_success (same lesson as BackendTargetAbsent).
+        - alert: UptimeProbesAbsent
+          expr: absent(probe_success) == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Uptime probing has disappeared"
+            description: "No probe_success series for 10 minutes — the blackbox exporter or the Probe object has vanished."
+
+        # cert-manager renews ~30 days out; two weeks left means renewal has
+        # been failing for two weeks — and there are still two weeks to fix it.
+        - alert: TLSCertExpiringSoon
+          expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 86400
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: {{`"TLS certificate for {{ $labels.instance }} expires in under 14 days"`}}
+            description: {{`"Certificate expires {{ $value | humanizeTimestamp }} — cert-manager renewal is not happening; check the Certificate and Order objects."`}}
+{{- end }}

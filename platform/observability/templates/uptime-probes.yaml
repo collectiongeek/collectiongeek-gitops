@@ -1,0 +1,25 @@
+{{- if .Values.uptime.enabled }}
+# The fourth prometheus-operator CRD (after ServiceMonitor/PodMonitor/
+# PrometheusRule): each scrape of blackbox:9115/probe?target=<url> IS the
+# probe. Picked up because probeSelectorNilUsesHelmValues=false (Phase 1).
+# Targets are per-env data (values-{test,prod}.yaml) — test also probes
+# prod's user-facing URLs, the independent vantage of doc §4.1.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: uptime
+  namespace: observability
+  labels:
+    app.kubernetes.io/part-of: platform-observability
+spec:
+  interval: 60s
+  module: http_2xx
+  prober:
+    url: blackbox.observability.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        {{- range .Values.uptime.targets }}
+        - {{ . }}
+        {{- end }}
+{{- end }}
