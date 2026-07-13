@@ -32,6 +32,9 @@ uptime:
     # these arrive via the TEST Slack channel — that's the point.
     - https://app.collectiongeek.app/
     - https://api.collectiongeek.app/healthz
+    # DRILL (§4.8 step 3) — cannot resolve, probe_success goes 0, ProbeFailed
+    # fires to Slack in ~4 min. REVERT this line once the alert is seen.
+    - https://down.test.collectiongeek.app/
 
 # Phase 4 §4.6: the dead-man's switch. Prerequisite: the AWS-side secret
 # exists (infra: HEALTHCHECKS_PING_URL Environment secret applied) — same
