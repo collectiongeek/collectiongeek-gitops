@@ -10,7 +10,11 @@ spec:
 
   source:
     repoURL: https://github.com/collectiongeek/collectiongeek-gitops.git
-    targetRevision: main
+    # Follow-up #23: prod pins an immutable SHA, so a sync can only ever
+    # deploy what the promotion PR showed. Promote = bump this SHA (the PR
+    # diff links the exact changeset), merge, `kubectl apply` this file,
+    # then manual sync. Rollback = revert the promotion PR and repeat.
+    targetRevision: 4a028c144a6a67c8146394a402ecb6d66b59b382
     path: charts/frontend
     helm:
       valueFiles:
