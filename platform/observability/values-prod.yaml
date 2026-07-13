@@ -16,12 +16,11 @@ backendMonitoring:
 grafanaOidc:
   enabled: true
 
-# Phase 4 §4.5: uptime probes — STAGED DARK until test verifies (§4.8).
-# The flip PR sets this, healthchecksPing and prometheus-blackbox-exporter
-# (bottom of this file) to true together, and uncomments the PHASE 4 FLIP
-# lines in the alertmanager block below.
+# Phase 4 §4.5: uptime probes + alert rules (the blackbox exporter itself is
+# enabled at the bottom of this file). Enabled after test verified (§4.8):
+# both drills passed 2026-07-13.
 uptime:
-  enabled: false
+  enabled: true
   targets:
     # This env's public doors, exercised through the full user path
     # (Route53 → NLB → ingress-nginx → TLS → pod). Prod's user-facing pair
@@ -35,7 +34,7 @@ uptime:
 # exists (infra: HEALTHCHECKS_PING_URL Environment secret applied) — same
 # rule as slackWebhook above.
 healthchecksPing:
-  enabled: false
+  enabled: true
 
 kube-prometheus-stack:
   prometheus:
@@ -66,8 +65,7 @@ kube-prometheus-stack:
       # /etc/alertmanager/secrets/<secret-name>/
       secrets:
         - alertmanager-slack-webhook
-        # PHASE 4 FLIP (§4.6): uncomment with healthchecksPing.enabled=true.
-        # - alertmanager-healthchecks-ping
+        - alertmanager-healthchecks-ping # Phase 4 §4.6 (healthchecksPing above)
     config:
       global:
         resolve_timeout: 5m
@@ -78,27 +76,23 @@ kube-prometheus-stack:
         repeat_interval: 12h
         receiver: slack
         routes:
-          # Watchdog fires ALWAYS (it proves alerting works). PHASE 4 FLIP
-          # (§4.6): delete this null route and uncomment the healthchecks one
-          # below — every notification becomes a heartbeat to healthchecks.io,
-          # which alarms when they STOP (see values-test.yaml for the
-          # commentary on the intervals).
-          - receiver: "null"
+          # Watchdog fires ALWAYS — that is its job. Phase 4 §4.6: every
+          # notification is a heartbeat to healthchecks.io, which alarms when
+          # they STOP (see values-test.yaml for the commentary on the
+          # intervals).
+          - receiver: healthchecks
             matchers:
               - alertname = "Watchdog"
-          # - receiver: healthchecks
-          #   matchers:
-          #     - alertname = "Watchdog"
-          #   group_wait: 0s
-          #   group_interval: 1m
-          #   repeat_interval: 5m
+            group_wait: 0s
+            group_interval: 1m
+            repeat_interval: 5m
       receivers:
         - name: "null"
-        # PHASE 4 FLIP (§4.6): uncomment with the route above.
-        # - name: healthchecks
-        #   webhook_configs:
-        #     - url_file: /etc/alertmanager/secrets/alertmanager-healthchecks-ping/url
-        #       send_resolved: false
+        - name: healthchecks
+          webhook_configs:
+            - url_file: /etc/alertmanager/secrets/alertmanager-healthchecks-ping/url
+              send_resolved: false # Watchdog never resolves; if it does,
+                # the silence itself is the signal
         - name: slack
           slack_configs:
             - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/url
@@ -206,7 +200,6 @@ tempo:
 
 # ---------------------------------------------------------------------------
 # Blackbox exporter (Phase 4) — probes the uptime.targets above. §4.5.
-# STAGED DARK until test verifies (§4.8); flip with uptime.enabled.
 # ---------------------------------------------------------------------------
 prometheus-blackbox-exporter:
-  enabled: false
+  enabled: true
