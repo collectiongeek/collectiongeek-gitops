@@ -2,7 +2,7 @@ name: Security Scan
 
 # IaC misconfig + secret scanning (Trivy) for Helm charts and ArgoCD
 # manifests. Posture: REPORT-ONLY — uploads to the Security tab, never
-# fails a PR. Tighten with exit-code: "1" once .trivyignore is tuned.
+# fails a PR. Tighten with exit-code: "1" once .trivyignore.yaml is tuned.
 
 on:
   pull_request:
@@ -52,6 +52,10 @@ jobs:
           exit-code: "0"              # report-only
         env:
           TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db
+          # Path-scoped acceptances. The structured .yaml ignore file is NOT
+          # auto-discovered (unlike the legacy .trivyignore) — it must be
+          # named explicitly, which this env var does.
+          TRIVY_IGNOREFILE: .trivyignore.yaml
 
       - name: Upload Trivy SARIF
         if: always()
