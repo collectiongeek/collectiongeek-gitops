@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/collectiongeek/frontend
-  tag: latest
+  tag: "" # always set per-env (values-test/values-prod); the template enforces it
   pullPolicy: IfNotPresent
   # pullSecret: ghcr-pull-secret  # Only needed if GHCR packages are private
 

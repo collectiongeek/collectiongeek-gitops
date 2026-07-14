@@ -11,3 +11,6 @@ Thumbs.db
 .idea/
 # Helm dependency archives for umbrella charts (Argo CD rebuilds them from Chart.lock)
 platform/*/charts/
+
+# CI scratch: the security workflow renders charts here for Trivy; never committed.
+rendered/
