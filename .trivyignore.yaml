@@ -1,0 +1,19 @@
+# Accepted misconfig findings, path-scoped (CodeRabbit on PR #20: a repo-root
+# .trivyignore would suppress these IDs in ANY future manifest too). Wired in
+# via TRIVY_IGNOREFILE in .github/workflows/security.yml — the structured
+# .yaml format is NOT picked up automatically like the legacy file was.
+misconfigurations:
+  # Workloads land in their namespace via the Argo CD Application's
+  # destination.namespace (argocd/*.yaml) — helm template output deliberately
+  # carries no metadata.namespace, so Trivy misreads it as "default".
+  - id: KSV-0110
+    statement: "Namespace is injected by the Argo CD Application destination, not the manifests."
+    paths: &chart_outputs
+      - "charts/**"
+      - "rendered/**"
+  # ghcr.io/collectiongeek is OUR registry: images are built and pushed only
+  # by this org's CI (app repo) and referenced by immutable per-env tags.
+  # Trivy's built-in trusted-registry list simply doesn't know it.
+  - id: KSV-0125
+    statement: "ghcr.io/collectiongeek is this project's own registry."
+    paths: *chart_outputs
