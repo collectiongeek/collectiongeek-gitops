@@ -20,16 +20,35 @@ spec:
       imagePullSecrets:
         - name: {{ .Values.image.pullSecret }}
       {{- end }}
+      # Hardened like the backend (Trivy KSV set). The image is
+      # nginx-unprivileged: listens on 8080, pid/temp files under /tmp,
+      # config rendered into conf.d at start — the two emptyDirs below are
+      # the only writable paths it needs, so the root filesystem can be
+      # read-only. It runs under any uid; 65532 matches the backend, and
+      # fsGroup is what makes the emptyDirs writable to it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ required "image.tag is required (set per-env in values-test/values-prod)" .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           envFrom:
             - configMapRef:
                 name: frontend-config
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           livenessProbe:
             httpGet:
@@ -47,3 +66,13 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp # nginx pid + temp files, rendered /config.js
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d # entrypoint renders default.conf here
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-conf
+          emptyDir: {}

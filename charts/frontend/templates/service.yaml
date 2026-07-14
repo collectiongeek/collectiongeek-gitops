@@ -8,7 +8,9 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: 80
+      # By NAME, not number: resolved per-pod, so a mixed rollout (old
+      # image on 80, unprivileged image on 8080) routes correctly to both.
+      targetPort: http
       protocol: TCP
       name: http
   selector:
