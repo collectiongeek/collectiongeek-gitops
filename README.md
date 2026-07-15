@@ -50,6 +50,16 @@ together:
    (Application objects are not themselves Argo-managed), then manual sync
    in the Argo CD UI. Rollback = revert the promotion PR and repeat.
 
+Two traps, both observed live:
+
+- **Promoting both services: run the two workflow dispatches sequentially.**
+  Both push a commit to this repo's `main`; concurrent runs race and the
+  loser fails on a rejected push. Re-running the failed one is safe.
+- **Merged ≠ applied.** After merging a pin PR, Argo CD still shows the app
+  green — Synced against the OLD pin — until the `kubectl apply`. If prod
+  looks suspiciously unchanged after a promotion, check
+  `spec.source.targetRevision` on the live Application before anything else.
+
 Test keeps tracking `main` with auto-sync — that is what test is for.
 
 ## Validating Changes Locally
