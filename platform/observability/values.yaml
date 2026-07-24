@@ -45,6 +45,20 @@ uptime:
 healthchecksPing:
   enabled: false
 
+# In-cluster HMAC-signing forwarder: Alertmanager → AWS DevOps Agent event
+# channel (DevOps Agent Alertmanager doc). severity=critical alerts auto-start
+# a PAID agent investigation whose findings land in this env's DevOps Agent
+# Slack channel; the regular Slack alert keeps flowing either way. Flip
+# per-env TOGETHER WITH the devops-agent route/receiver block in that env's
+# values file — the AWS-side secret must exist first (infra:
+# devops_agent_webhook_url/_secret), same rule as slackWebhook.
+devopsAgentForwarder:
+  enabled: false
+  # Shown in investigation titles so the operator app / Slack post reads
+  # "[test] ..." vs "[prod] ..." at a glance (the space is per-account, but
+  # titles travel — e.g. screenshots, cross-posted findings).
+  environmentLabel: ""
+
 # ---------------------------------------------------------------------------
 # kube-prometheus-stack
 # ---------------------------------------------------------------------------

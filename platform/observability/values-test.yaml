@@ -39,6 +39,16 @@ uptime:
 healthchecksPing:
   enabled: true
 
+# DevOps Agent Alertmanager doc §A: severity=critical alerts also wake the
+# DevOps Agent (PAID investigation; findings land in
+# #collectiongeek-devops-agent-test). Prerequisite: the AWS-side secret
+# exists (infra: DEVOPS_AGENT_WEBHOOK_URL/_SECRET Environment secrets
+# applied) — same rule as slackWebhook above. Enabled TOGETHER WITH the
+# devops-agent route + receiver in the alertmanager block below.
+devopsAgentForwarder:
+  enabled: true
+  environmentLabel: test
+
 kube-prometheus-stack:
   prometheus:
     prometheusSpec:
@@ -92,6 +102,22 @@ kube-prometheus-stack:
             group_wait: 0s
             group_interval: 1m
             repeat_interval: 5m
+          # DevOps Agent doc §A: criticals ALSO start a paid investigation.
+          # continue: true keeps evaluating siblings so the catch-all below
+          # still delivers the same alert to Slack. The long repeat_interval
+          # is cost control — each repeat re-POSTs the incident (the
+          # forwarder's deterministic incidentId makes that a de-dup, but
+          # there's no reason to knock daily on a door that's already open).
+          - receiver: devops-agent
+            matchers:
+              - severity = "critical"
+            continue: true
+            repeat_interval: 24h
+          # Catch-all, DELIBERATE: once a child route matches (devops-agent
+          # above), the alert never falls back to the root receiver —
+          # continue only keeps scanning siblings. Without this line,
+          # criticals would reach the agent but VANISH from Slack.
+          - receiver: slack
       receivers:
         - name: "null"
         - name: healthchecks
@@ -99,6 +125,14 @@ kube-prometheus-stack:
             - url_file: /etc/alertmanager/secrets/alertmanager-healthchecks-ping/url
               send_resolved: false # Watchdog never resolves; if it does,
                 # the silence itself is the signal
+        - name: devops-agent
+          webhook_configs:
+            # The in-cluster forwarder (devops-agent-forwarder.yaml): it
+            # HMAC-signs and relays to the event channel. Plain http is fine
+            # — this never leaves the cluster network; the hop to AWS is TLS.
+            - url: http://devops-agent-forwarder.observability.svc:8080/alert
+              send_resolved: false # investigations are about firing alerts;
+                # resolution shows up in the investigation itself
         - name: slack
           slack_configs:
             - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/url
