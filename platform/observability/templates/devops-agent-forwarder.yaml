@@ -1,0 +1,89 @@
+{{- if .Values.devopsAgentForwarder.enabled }}
+# Alertmanager → AWS DevOps Agent event-channel forwarder (DevOps Agent
+# Alertmanager doc §A). Alertmanager's webhook receiver can only POST a fixed
+# URL — it cannot compute the per-request HMAC headers the event channel
+# demands — so this tiny stdlib-only Python shim sits in between: it receives
+# the Alertmanager webhook batch, reshapes it into the DevOps Agent incident
+# payload, signs it (HMAC-SHA256 over "<timestamp>:<body>", same scheme as
+# AWS's own CloudWatch sample), and forwards it. The webhook URL + secret
+# arrive as files via ESO (see devops-agent-webhook-externalsecret.yaml) and
+# are re-read on every request, so an ESO refresh needs no pod restart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-agent-forwarder
+data:
+  forwarder.py: |
+{{ .Files.Get "files/forwarder.py" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-agent-forwarder
+  labels:
+    app.kubernetes.io/name: devops-agent-forwarder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: devops-agent-forwarder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: devops-agent-forwarder
+      annotations:
+        # Roll the pod whenever the script above changes — otherwise a synced
+        # ConfigMap edit would sit unused until something else restarts it.
+        checksum/script: {{ .Files.Get "files/forwarder.py" | sha256sum | trunc 32 | quote }}
+    spec:
+      automountServiceAccountToken: false # talks only to the event channel
+      containers:
+        - name: forwarder
+          # Stock interpreter, pinned like everything else in this repo; the
+          # "image" that actually matters is the ConfigMap-mounted script.
+          image: python:3.13.5-slim
+          command: ["python3", "-u", "/app/forwarder.py"]
+          env:
+            - name: ENV_LABEL
+              value: {{ .Values.devopsAgentForwarder.environmentLabel | quote }}
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 100m, memory: 128Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+            seccompProfile: { type: RuntimeDefault }
+          volumeMounts:
+            - { name: script, mountPath: /app, readOnly: true }
+            - { name: creds, mountPath: /creds, readOnly: true }
+      volumes:
+        - name: script
+          configMap: { name: devops-agent-forwarder }
+        - name: creds
+          secret: { secretName: devops-agent-webhook }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-agent-forwarder
+  labels:
+    app.kubernetes.io/name: devops-agent-forwarder
+spec:
+  selector:
+    app.kubernetes.io/name: devops-agent-forwarder
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}
