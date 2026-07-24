@@ -36,13 +36,12 @@ uptime:
 healthchecksPing:
   enabled: true
 
-# DevOps Agent Alertmanager doc §A — STAGED DARK, same playbook as every
-# other prod flip: verify in test first, then a one-line PR sets this true
-# and uncomments the devops-agent route + receiver in the alertmanager block
-# below. Prerequisite: infra's DEVOPS_AGENT_WEBHOOK_URL/_SECRET applied for
-# prod (already set alongside test).
+# DevOps Agent Alertmanager doc §A: severity=critical alerts also wake the
+# DevOps Agent (PAID investigation; findings land in
+# #collectiongeek-devops-agent-prod). Flipped 2026-07-24 after the test
+# drill verified end to end (doc §A.6).
 devopsAgentForwarder:
-  enabled: false
+  enabled: true
   environmentLabel: prod
 
 kube-prometheus-stack:
@@ -95,18 +94,17 @@ kube-prometheus-stack:
             group_wait: 0s
             group_interval: 1m
             repeat_interval: 5m
-          # ------------------------------------------------------------
-          # DEVOPS AGENT (doc §A) — uncomment BOTH this route pair and the
-          # devops-agent receiver below when flipping devopsAgentForwarder
-          # above (see values-test.yaml for the commentary on continue: true
-          # and the deliberate catch-all).
-          # ------------------------------------------------------------
-          # - receiver: devops-agent
-          #   matchers:
-          #     - severity = "critical"
-          #   continue: true
-          #   repeat_interval: 24h
-          # - receiver: slack
+          # DevOps Agent doc §A: criticals ALSO start a paid investigation
+          # (see values-test.yaml for the commentary on continue: true and
+          # the deliberate catch-all below).
+          - receiver: devops-agent
+            matchers:
+              - severity = "critical"
+            continue: true
+            repeat_interval: 24h
+          # Catch-all, DELIBERATE: without it, criticals matched above would
+          # never fall back to the root receiver and would vanish from Slack.
+          - receiver: slack
       receivers:
         - name: "null"
         - name: healthchecks
@@ -114,10 +112,10 @@ kube-prometheus-stack:
             - url_file: /etc/alertmanager/secrets/alertmanager-healthchecks-ping/url
               send_resolved: false # Watchdog never resolves; if it does,
                 # the silence itself is the signal
-        # - name: devops-agent
-        #   webhook_configs:
-        #     - url: http://devops-agent-forwarder.observability.svc:8080/alert
-        #       send_resolved: false
+        - name: devops-agent
+          webhook_configs:
+            - url: http://devops-agent-forwarder.observability.svc:8080/alert
+              send_resolved: false # investigations are about firing alerts
         - name: slack
           slack_configs:
             - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/url
