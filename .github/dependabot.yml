@@ -1,0 +1,19 @@
+# Dependabot keeps SHA-pinned GitHub Actions current. Without this, every
+# `uses: org/action@<sha>` in .github/workflows/ would freeze at its initial
+# SHA and silently miss security patches the action's maintainers ship.
+#
+# Dependabot opens a weekly PR per stale pin; review it like any other PR
+# (the SHA changes, the trailing `# v4.x.x` comment moves with it).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
