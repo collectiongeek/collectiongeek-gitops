@@ -25,6 +25,13 @@ jobs:
       security-events: write   # required to upload SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Token isn't needed after checkout — Trivy scans rendered local files
+          # and no later step pushes/fetches (the SARIF upload uses the
+          # security-events GITHUB_TOKEN, not the persisted git credential).
+          # Dropping it shrinks the blast radius if a downstream action is ever
+          # compromised. Matches the infra repo's security.yml.
+          persist-credentials: false
 
       # Render each chart with its env values so the scan sees what ArgoCD
       # actually applies (prod/test replica counts, resources, ingress),
